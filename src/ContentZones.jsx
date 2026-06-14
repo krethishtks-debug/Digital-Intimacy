@@ -4,6 +4,31 @@
 import { useState, useEffect, useRef, useContext } from 'react'
 import { StaticViewContext } from './viewContext.js'
 
+// Shared so the sky-citations overlay (App) and the static teacher view
+// render the same reference list.
+export const BIBLIOGRAPHY = [
+  "Aibangbee, M., Micheal, S., Mapedzahama, V., Liamputtong, P., Pithavadian, R., & Hossain, S. Z. (2023). Migrant and refugee youth's sexual and reproductive health and rights: A scoping review to inform policies and programs. International Journal of Public Health.",
+  "Avci, G., et al. (2024). A systematic review of social media use and adolescent identity development. Adolescent Research Review. https://doi.org/10.1007/s40894-024-00251-1",
+  "Bőthe, B., et al. (2023). Exposure to pornography and adolescent sexual behavior: Systematic review. Journal of Medical Internet Research, 25, e43116. https://doi.org/10.2196/43116",
+  "Canada.ca. (2015, March 10). Protecting Canadians from Online Crime Act. Government of Canada.",
+  "Craig, W., Pickett, W., & King, M. (2020). The health of Canadian youth: Findings from the Health Behaviour in School-Aged Children study. Public Health Agency of Canada.",
+  "Díaz-Rodríguez, M. V., et al. (2024). Insights from a qualitative exploration of adolescents' opinions on sex education. Children, 11(1), 110. https://doi.org/10.3390/children11010110",
+  "Flaudias, V., et al. (2025). Social media use and roles of self-objectification, self-compassion and body image concerns: A systematic review. Journal of Eating Disorders, 13(1), 192.",
+  "Hammami, N., Azevedo Da Silva, M., & Elgar, F. J. (2022). Trends in gender and socioeconomic inequalities in adolescent health over 16 years (2002–2018). Health Promotion and Chronic Disease Prevention in Canada, 42(2), 68–78.",
+  "Holfeld, B., Mishna, F., Craig, W., & Zuberi, S. (2024). A latent profile analysis of the consensual and non-consensual sexting experiences among Canadian adolescents. Youth & Society.",
+  "Ji, D., et al. (2025). Sexual health behavior trends in a nationally representative sample of Canadian migrant adolescents from 2014 to 2022. BMC Public Health.",
+  "Kim, S., Martin-Storey, A., Drossos, A., Barbosa, S., & Georgiades, K. (2020). Prevalence and correlates of sexting behaviors in a provincially representative sample of adolescents. Canadian Journal of Psychiatry, 65(7).",
+  "Költő, A., et al. (2025). Cross-national trends in early sexual initiation among 15-year-old adolescents, 2002–2022. International Journal of Public Health.",
+  "Meherali, S., et al. (2022). Understanding the sexual and reproductive health needs of immigrant adolescents in Canada: A qualitative study. Frontiers in Reproductive Health, 4, 940979.",
+  "Oliver, V., & Flicker, S. (2024). Declining nudes: Canadian teachers' responses to including sexting in the sexual health and human development curriculum. Sex Education, 24(3), 369–384.",
+  "Papageorgiou, A., et al. (2022). \"Why don't I look like her?\" How adolescent girls view social media and its connection to body image. BMC Women's Health, 22, 261.",
+  "Rotermann, M., & McKay, A. (2020). Sexual behaviours, condom use and other contraceptive methods among 15- to 24-year-olds in Canada. Health Reports, 31(9), 3–12.",
+  "Shoveller, J. A., Johnson, J. L., Langille, D. B., & Mitchell, T. (2004). Socio-cultural influences on young people's sexual development. Social Science & Medicine, 59(3), 473–487.",
+  "Statistics Canada. (2024). Canadian Community Health Survey: Sexual health indicators among youth aged 15–24. Catalogue no. 82-003-X.",
+  "Tolman, D. L., & McClelland, S. I. (2011). Normative sexuality development in adolescence: A decade in review, 2000–2009. Journal of Research on Adolescence, 21(1), 242–255.",
+  "van de Bongardt, D., Reitz, E., Sandfort, T., & Deković, M. (2015). A meta-analysis of the relations between three types of peer norms and adolescent sexual behavior. Personality and Social Psychology Review, 19(3), 203–234.",
+]
+
 // ─── ANIMATION CSS ─────────────────────────────────────────────
 const ANIM_CSS = `
 @keyframes fadeInModal  { from { opacity:0 } to { opacity:1 } }
@@ -424,26 +449,29 @@ function Aquarium({ creatures, accent, onSelect }) {
 
   return (
     <div style={{ marginTop:'2.2rem', marginBottom:'0.5rem' }}>
-      {/* Instruction text */}
+      {/* Instruction pill */}
       <div style={{
-        display:'flex', alignItems:'center', gap:'0.5rem',
-        marginBottom:'0.9rem',
+        display:'flex', alignItems:'center', gap:'0.7rem',
+        marginBottom:'1rem', flexWrap:'wrap',
       }}>
-        <span style={{ fontSize:'1rem', lineHeight:1 }}>🪼</span>
         <span style={{
+          display:'inline-flex', alignItems:'center', gap:8,
+          padding:'7px 15px', borderRadius:999,
+          background:rgba(0.14), border:`1px solid ${rgba(0.45)}`,
+          boxShadow:`0 0 18px ${rgba(0.12)}`,
           fontFamily:'"Inter Tight",sans-serif',
-          fontSize:'0.72rem', fontWeight:500,
-          letterSpacing:'0.09em', textTransform:'uppercase',
-          color:rgba(0.52),
+          fontSize:'0.82rem', fontWeight:500, letterSpacing:'0.02em',
+          color:'rgba(228,244,251,0.96)',
         }}>
-          Click a creature to explore its research content
+          <span aria-hidden="true" style={{ fontSize:'1rem', lineHeight:1 }}>🪼</span>
+          Click any creature to open its research
         </span>
         {N > PER && (
           <span style={{
             marginLeft:'auto',
             fontFamily:'"JetBrains Mono",monospace',
-            fontSize:'0.58rem', letterSpacing:'0.12em',
-            color:rgba(0.32),
+            fontSize:'0.64rem', letterSpacing:'0.12em',
+            color:rgba(0.7),
           }}>{page+1} / {maxP+1}</span>
         )}
       </div>
@@ -659,10 +687,12 @@ function Zone({ id, label, depth, atm, bg, accent, title, children, ambient = 0 
     <section
       id={id}
       style={{
-        minHeight: staticView ? 'auto' : '100vh', background:bg,
-        padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(4rem,10vh,7rem) clamp(2rem,6vw,7rem)',
+        minHeight: staticView ? 'auto' : '100vh',
+        // soft vertical fade so adjacent zones cross-blend instead of butting at a hard seam
+        background: staticView ? bg : `linear-gradient(to bottom, transparent 0%, ${bg} 13%, ${bg} 87%, transparent 100%)`,
+        padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(5rem,12vh,8rem) clamp(2rem,6vw,7rem)',
         display:'flex', flexDirection:'column', justifyContent: staticView ? 'flex-start' : 'center',
-        position:'relative', borderTop:`1px solid ${accent}18`,
+        position:'relative', borderTop: staticView ? `1px solid ${accent}18` : 'none',
         overflow:'hidden', isolation:'isolate',
       }}
     >
@@ -1107,10 +1137,11 @@ function Zone4() {
 
   return (
     <section id="zone-4" style={{
-      minHeight: staticView ? 'auto' : '100vh', background:'rgba(2,0,8,0.96)',
-      padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(4rem,10vh,7rem) clamp(2rem,6vw,7rem)',
+      minHeight: staticView ? 'auto' : '100vh',
+      background: staticView ? 'rgba(2,0,8,0.96)' : 'linear-gradient(to bottom, transparent 0%, rgba(2,0,8,0.96) 13%, rgba(2,0,8,0.96) 87%, transparent 100%)',
+      padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(5rem,12vh,8rem) clamp(2rem,6vw,7rem)',
       display:'flex', flexDirection:'column', justifyContent: staticView ? 'flex-start' : 'center',
-      position:'relative', borderTop:`1px solid ${accent}18`,
+      position:'relative', borderTop: staticView ? `1px solid ${accent}18` : 'none',
       overflow:'hidden', isolation:'isolate',
     }}>
       {!staticView && <DeepAmbience count={30} accent={accent} />}
@@ -1215,10 +1246,11 @@ function Zone5() {
 
   return (
     <section id="zone-5" style={{
-      minHeight: staticView ? 'auto' : '100vh', background:'rgba(4,0,2,0.98)',
-      padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(4rem,10vh,7rem) clamp(2rem,6vw,7rem)',
+      minHeight: staticView ? 'auto' : '100vh',
+      background: staticView ? 'rgba(4,0,2,0.98)' : 'linear-gradient(to bottom, transparent 0%, rgba(4,0,2,0.98) 13%, rgba(4,0,2,0.98) 87%, transparent 100%)',
+      padding: staticView ? 'clamp(2.4rem,5vh,3.6rem) clamp(2rem,6vw,7rem)' : 'clamp(5rem,12vh,8rem) clamp(2rem,6vw,7rem)',
       display:'flex', flexDirection:'column', justifyContent: staticView ? 'flex-start' : 'center',
-      position:'relative', borderTop:`1px solid ${accent}18`,
+      position:'relative', borderTop: staticView ? `1px solid ${accent}18` : 'none',
       overflow:'hidden', isolation:'isolate',
     }}>
       {!staticView && <DeepAmbience count={34} accent={accent} />}
@@ -1286,8 +1318,9 @@ function Zone5() {
 // ═══════════════════════════════════════════════════════════════
 // ZONE 6 — ASCENDING / CONCLUSION
 // ═══════════════════════════════════════════════════════════════
-function Zone6() {
+function Zone6({ onViewCitations }) {
   const accent = '#52b788'
+  const staticView = useContext(StaticViewContext)
   const [open, setOpen] = useState(null)
   const creatures = [
     {
@@ -1359,28 +1392,7 @@ function Zone6() {
     { code:'Q04', text:"Bill C-13 made the non-consensual distribution of intimate images a criminal offence in Canada. The Nova Scotia Cyber-Safety Act tried to go further and was struck down by the courts. Given the documented limitations of criminal law as a response to this problem, what level of intervention (individual, school, policy, platform regulation) do you believe would have the greatest impact, and why?" },
   ]
 
-  const bibliography = [
-    "Aibangbee, M., Micheal, S., Mapedzahama, V., Liamputtong, P., Pithavadian, R., & Hossain, S. Z. (2023). Migrant and refugee youth's sexual and reproductive health and rights: A scoping review to inform policies and programs. International Journal of Public Health.",
-    "Avci, G., et al. (2024). A systematic review of social media use and adolescent identity development. Adolescent Research Review. https://doi.org/10.1007/s40894-024-00251-1",
-    "Bőthe, B., et al. (2023). Exposure to pornography and adolescent sexual behavior: Systematic review. Journal of Medical Internet Research, 25, e43116. https://doi.org/10.2196/43116",
-    "Canada.ca. (2015, March 10). Protecting Canadians from Online Crime Act. Government of Canada.",
-    "Craig, W., Pickett, W., & King, M. (2020). The health of Canadian youth: Findings from the Health Behaviour in School-Aged Children study. Public Health Agency of Canada.",
-    "Díaz-Rodríguez, M. V., et al. (2024). Insights from a qualitative exploration of adolescents' opinions on sex education. Children, 11(1), 110. https://doi.org/10.3390/children11010110",
-    "Flaudias, V., et al. (2025). Social media use and roles of self-objectification, self-compassion and body image concerns: A systematic review. Journal of Eating Disorders, 13(1), 192.",
-    "Hammami, N., Azevedo Da Silva, M., & Elgar, F. J. (2022). Trends in gender and socioeconomic inequalities in adolescent health over 16 years (2002–2018). Health Promotion and Chronic Disease Prevention in Canada, 42(2), 68–78.",
-    "Holfeld, B., Mishna, F., Craig, W., & Zuberi, S. (2024). A latent profile analysis of the consensual and non-consensual sexting experiences among Canadian adolescents. Youth & Society.",
-    "Ji, D., et al. (2025). Sexual health behavior trends in a nationally representative sample of Canadian migrant adolescents from 2014 to 2022. BMC Public Health.",
-    "Kim, S., Martin-Storey, A., Drossos, A., Barbosa, S., & Georgiades, K. (2020). Prevalence and correlates of sexting behaviors in a provincially representative sample of adolescents. Canadian Journal of Psychiatry, 65(7).",
-    "Költő, A., et al. (2025). Cross-national trends in early sexual initiation among 15-year-old adolescents, 2002–2022. International Journal of Public Health.",
-    "Meherali, S., et al. (2022). Understanding the sexual and reproductive health needs of immigrant adolescents in Canada: A qualitative study. Frontiers in Reproductive Health, 4, 940979.",
-    "Oliver, V., & Flicker, S. (2024). Declining nudes: Canadian teachers' responses to including sexting in the sexual health and human development curriculum. Sex Education, 24(3), 369–384.",
-    "Papageorgiou, A., et al. (2022). \"Why don't I look like her?\" How adolescent girls view social media and its connection to body image. BMC Women's Health, 22, 261.",
-    "Rotermann, M., & McKay, A. (2020). Sexual behaviours, condom use and other contraceptive methods among 15- to 24-year-olds in Canada. Health Reports, 31(9), 3–12.",
-    "Shoveller, J. A., Johnson, J. L., Langille, D. B., & Mitchell, T. (2004). Socio-cultural influences on young people's sexual development. Social Science & Medicine, 59(3), 473–487.",
-    "Statistics Canada. (2024). Canadian Community Health Survey: Sexual health indicators among youth aged 15–24. Catalogue no. 82-003-X.",
-    "Tolman, D. L., & McClelland, S. I. (2011). Normative sexuality development in adolescence: A decade in review, 2000–2009. Journal of Research on Adolescence, 21(1), 242–255.",
-    "van de Bongardt, D., Reitz, E., Sandfort, T., & Deković, M. (2015). A meta-analysis of the relations between three types of peer norms and adolescent sexual behavior. Personality and Social Psychology Review, 19(3), 203–234.",
-  ]
+  const bibliography = BIBLIOGRAPHY
 
   return (
     <Zone id="zone-6" label="Ascending" depth="Decompression" atm="Normalizing"
@@ -1419,21 +1431,52 @@ function Zone6() {
         ))}
       </div>
 
-      {/* Bibliography */}
-      <div style={{ maxWidth:760 }}>
-        <div style={{ fontFamily:'"JetBrains Mono",monospace', fontSize:'0.60rem', letterSpacing:'0.22em', textTransform:'uppercase', color:`${accent}88`, marginBottom:'1.4rem' }}>
-          Bibliography
+      {/* Bibliography — interactive view launches the sky; teacher view lists it */}
+      {staticView ? (
+        <div style={{ maxWidth:760 }}>
+          <div style={{ fontFamily:'"JetBrains Mono",monospace', fontSize:'0.60rem', letterSpacing:'0.22em', textTransform:'uppercase', color:`${accent}88`, marginBottom:'1.4rem' }}>
+            Bibliography
+          </div>
+          {bibliography.map((entry, i) => (
+            <p key={i} style={{
+              fontFamily:'"Inter Tight",sans-serif', fontSize:'0.85rem', fontWeight:300,
+              lineHeight:1.8, color:'rgba(155,200,218,0.70)',
+              marginBottom:'0.9rem', paddingLeft:'1.4rem', textIndent:'-1.4rem',
+            }}>
+              {entry}
+            </p>
+          ))}
         </div>
-        {bibliography.map((entry, i) => (
-          <p key={i} style={{
-            fontFamily:'"Inter Tight",sans-serif', fontSize:'0.85rem', fontWeight:300,
-            lineHeight:1.8, color:'rgba(155,200,218,0.70)',
-            marginBottom:'0.9rem', paddingLeft:'1.4rem', textIndent:'-1.4rem',
-          }}>
-            {entry}
+      ) : (
+        <div style={{ maxWidth:620 }}>
+          <div style={{ fontFamily:'"JetBrains Mono",monospace', fontSize:'0.60rem', letterSpacing:'0.22em', textTransform:'uppercase', color:`${accent}88`, marginBottom:'0.9rem' }}>
+            Bibliography · {bibliography.length} Sources
+          </div>
+          <p style={{ fontFamily:'"Inter Tight",sans-serif', fontSize:'0.95rem', fontWeight:400, lineHeight:1.7, color:'rgba(205,232,224,0.82)', marginBottom:'1.4rem' }}>
+            The full reference list isn't buried in text down here in the dark. Break the surface and read it in the open sky above the yacht.
           </p>
-        ))}
-      </div>
+          <button
+            onClick={() => onViewCitations?.()}
+            style={{
+              display:'inline-flex', alignItems:'center', gap:12,
+              padding:'15px 30px', cursor:'pointer',
+              background:`linear-gradient(180deg, ${accent}33, ${accent}14)`,
+              border:`1px solid ${accent}`, borderRadius:10,
+              color:'#eafff6',
+              fontFamily:'"JetBrains Mono",monospace', fontSize:'0.74rem',
+              letterSpacing:'0.2em', textTransform:'uppercase',
+              boxShadow:`0 0 22px ${accent}33, inset 0 1px 0 rgba(255,255,255,0.08)`,
+              transition:'transform 0.18s ease, box-shadow 0.25s ease, background 0.25s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow=`0 0 34px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.12)` }}
+            onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow=`0 0 22px ${accent}33, inset 0 1px 0 rgba(255,255,255,0.08)` }}
+          >
+            <span aria-hidden="true" style={{ fontSize:'1.05rem' }}>🌀</span>
+            Surface for the Citations
+            <span aria-hidden="true" style={{ fontSize:'1.1rem' }}>↑</span>
+          </button>
+        </div>
+      )}
 
       <Stats accent={accent} items={[
         { val:'20', label:'Sources Cited' },
@@ -1447,7 +1490,7 @@ function Zone6() {
 }
 
 // ─── EXPORT ───────────────────────────────────────────────────
-export function ContentZones({ staticView = false }) {
+export function ContentZones({ staticView = false, onViewCitations }) {
   return (
     <StaticViewContext.Provider value={staticView}>
       <style>{ANIM_CSS}</style>
@@ -1457,7 +1500,7 @@ export function ContentZones({ staticView = false }) {
       <Zone3 />
       <Zone4 />
       <Zone5 />
-      <Zone6 />
+      <Zone6 onViewCitations={onViewCitations} />
     </StaticViewContext.Provider>
   )
 }

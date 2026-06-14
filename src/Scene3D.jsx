@@ -18,14 +18,14 @@ import { DIVE_AT } from './journey.js'
 // OUTSIDE AGAIN (full exterior view off the side) → drop, splash —
 // the dive begins → descend through the zones → ascend.
 const PATH = [
-  { at: 0.000,   p: [12, 7.0, 42],     l: [0, 4.5, 0],     rel: true,  fog: [0xb8dce8, 0.0015] }, // OUTSIDE — hero 3/4 bow view
-  { at: 0.022,   p: [-30, 7.0, 22],    l: [-9, 4.0, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // swivel around the stern
-  { at: 0.038,   p: [-22, 5.2, 6],     l: [-10, 4.0, 0],   rel: true,  fog: [0xb8dce8, 0.0015] }, // lining up with the aft deck
-  { at: 0.050,   p: [-15.5, 4.5, 0.4], l: [-7, 3.8, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // over the swim platform
-  { at: 0.062,   p: [-12.0, 3.95, 0],  l: [-5.9, 3.6, 0],  rel: true,  fog: [0xb8dce8, 0.0015] }, // INSIDE — the pool deck
-  { at: 0.100,   p: [-10.6, 3.90, 0],  l: [-5.9, 3.5, 0],  rel: true,  fog: [0xb8dce8, 0.0015] }, // slow push while reading the thesis
-  { at: 0.122,   p: [-6, 4.6, 8],      l: [-4, 3.2, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // stepping over the rail
-  { at: 0.138,   p: [-2, 5.5, 17],     l: [-3, 2.5, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // OUTSIDE AGAIN — full exterior view
+  { at: 0.000,   p: [-42, 13, 16],     l: [16, 2.5, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // OUTSIDE — stern chase, bow to the horizon
+  { at: 0.030,   p: [-34, 9.5, 18],    l: [2, 3.5, 0],     rel: true,  fog: [0xb8dce8, 0.0015] }, // easing down toward the boat
+  { at: 0.052,   p: [-24, 6.5, 15],    l: [-6, 4.0, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // swinging to the aft deck
+  { at: 0.070,   p: [-15.5, 4.6, 4],   l: [-7, 3.8, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // over the swim platform
+  { at: 0.088,   p: [-12.0, 3.95, 0],  l: [-5.9, 3.6, 0],  rel: true,  fog: [0xb8dce8, 0.0015] }, // INSIDE — the pool deck
+  { at: 0.116,   p: [-10.6, 3.90, 0],  l: [-5.9, 3.5, 0],  rel: true,  fog: [0xb8dce8, 0.0015] }, // dwell while reading the thesis
+  { at: 0.134,   p: [-6, 4.6, 8],      l: [-4, 3.2, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // stepping over the rail
+  { at: 0.148,   p: [-2, 5.5, 17],     l: [-3, 2.5, 0],    rel: true,  fog: [0xb8dce8, 0.0015] }, // OUTSIDE AGAIN — full exterior view
   { at: DIVE_AT, p: [0, 1.2, 19],      l: [0, -3.5, 20],   rel: true,  fog: [0x1a6a96, 0.0100] }, // the jump — falling toward the water
   { at: 0.172,   p: [0, -3.5, 22],     l: [0, -6.5, 12],   rel: false, fog: [0x1a6a96, 0.0100] }, // splash — underwater
   { at: 0.205,   p: [0, -5.0, 25],     l: [0, -7.0, 2],    rel: false, fog: [0x10507a, 0.0110] }, // epipelagic drift (zone 1b)
@@ -343,18 +343,20 @@ function BoatWake({ boatStateRef }) {
   useFrame(() => {
     if (!ref.current || !boatStateRef?.current) return
     const b = boatStateRef.current
-    ref.current.position.x = b.pos.x - Math.sin(b.heading) * 2
-    ref.current.position.z = b.pos.z - Math.cos(b.heading) * 2
-    ref.current.rotation.y = b.heading
+    const c = Math.cos(b.heading), s = Math.sin(b.heading)
+    // Trail behind the stern (hull bow points +x, so the stern is −x)
+    ref.current.position.x = b.pos.x - c * 15
+    ref.current.position.z = b.pos.z + s * 15
+    ref.current.rotation.y = b.heading + Math.PI / 2
     const spd = b.speed
-    ref.current.scale.setScalar(Math.min(1, spd * 0.3 + 0.05))
-    ref.current.material.opacity = Math.min(0.6, spd * 0.12)
+    ref.current.scale.setScalar(Math.min(1.15, spd * 0.16 + 0.30))
+    ref.current.material.opacity = Math.min(0.5, spd * 0.12 + 0.05)
   })
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-      <coneGeometry args={[4, 14, 6, 1, true]} />
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
+      <coneGeometry args={[5, 20, 7, 1, true]} />
       <meshStandardMaterial
-        color={0xaad4e8} roughness={0.95} transparent opacity={0} side={THREE.BackSide}
+        color={0xbfe2f2} roughness={0.92} transparent opacity={0} side={THREE.DoubleSide}
       />
     </mesh>
   )
@@ -421,16 +423,23 @@ function OceanFloor({ scrollRef }) {
 }
 
 // ─── SCENE CONTROLLER (camera + keyboard + boat physics) ─────
-function SceneController({ scrollRef, boatStateRef }) {
+function SceneController({ scrollRef, boatStateRef, flightRef }) {
   const { camera, scene } = useThree()
-  const tPos  = useRef(new THREE.Vector3(12, 7, 42))
-  const tLook = useRef(new THREE.Vector3(0, 4.5, 0))
+  const tPos  = useRef(new THREE.Vector3(-42, 13, 16))
+  const tLook = useRef(new THREE.Vector3(16, 2.5, 0))
   const ptA = useRef(new THREE.Vector3())
   const ptB = useRef(new THREE.Vector3())
   const lkA = useRef(new THREE.Vector3())
   const lkB = useRef(new THREE.Vector3())
   const fogColor = useRef(new THREE.Color())
   const keys  = useRef({})
+  const spSmooth = useRef(0)
+  const inited   = useRef(false)
+  // ── sky-flight state machine ──
+  const flMode  = useRef('none')
+  const flT     = useRef(0)
+  const flAng   = useRef(0)
+  const flStart = useRef(new THREE.Vector3())
 
   useEffect(() => {
     const dn = e => { keys.current[e.key] = true;  if (e.key.startsWith('Arrow')) e.preventDefault() }
@@ -441,20 +450,78 @@ function SceneController({ scrollRef, boatStateRef }) {
   }, [])
 
   useFrame((state, delta) => {
-    const sp = scrollRef.current
+    // Clamp delta so a tab-refocus pause can't fling the camera
+    const dt = Math.min(delta, 0.05)
+    const spRaw = scrollRef.current
+    if (!inited.current) { spSmooth.current = spRaw; inited.current = true }
+    // Smooth the scroll input so discrete wheel / trackpad steps glide
+    // instead of jolting the camera between waypoints.
+    spSmooth.current += (spRaw - spSmooth.current) * (1 - Math.exp(-dt / 0.09))
+    const sp = spSmooth.current
     const b  = boatStateRef.current
 
-    // ── Boat physics (sailable only at the hero) ──
-    if (sp < 0.02) {
-      if (keys.current['ArrowLeft'])  b.heading += delta * 0.9
-      if (keys.current['ArrowRight']) b.heading -= delta * 0.9
-      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + delta * 0.8, 10)
-      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - delta * 1.2,  0)
+    // ── Sky flight (citations launch) — overrides the scroll camera ──
+    const fmode = flightRef?.current?.mode ?? 'none'
+    if (fmode !== flMode.current) {
+      if (fmode !== 'none') {
+        flT.current = 0
+        flStart.current.copy(camera.position)
+        flAng.current = Math.atan2(camera.position.z - b.pos.z, camera.position.x - b.pos.x)
+      } else {
+        spSmooth.current = scrollRef.current // snap the scroll-cam back on return to sea
+      }
+      flMode.current = fmode
     }
-    b.targetSpeed *= 0.994
-    b.speed += (b.targetSpeed - b.speed) * 0.06
-    b.pos.x += Math.sin(b.heading) * b.speed * delta
-    b.pos.z += Math.cos(b.heading) * b.speed * delta
+    if (fmode !== 'none') {
+      flT.current += dt
+      const lrp = (a, z, t) => a + (z - a) * t
+      const smoothstep = t => t * t * (3 - 2 * t)
+      const SKY_Y = 95, SKY_R = 62
+      const bx = b.pos.x, bz = b.pos.z
+      if (fmode === 'launch') {
+        const p = Math.min(flT.current / 3.4, 1)
+        const e = smoothstep(p)
+        const ang = flAng.current + (1 - Math.pow(1 - p, 2)) * Math.PI * 2.6 // accelerating spin
+        const radius = lrp(7, SKY_R, e)
+        tPos.current.set(bx + Math.cos(ang) * radius, lrp(flStart.current.y, SKY_Y, e), bz + Math.sin(ang) * radius)
+        tLook.current.set(bx, lrp(Math.min(flStart.current.y, 0) * 0.5, 9, e), bz)
+        // burn off the deep murk as the whirlpool launches us upward
+        if (scene.fog) { scene.fog.density *= Math.max(0, 1 - dt * 3.2); if (scene.fog.density < 0.0006) { scene.fog = null; scene.background = null } }
+      } else if (fmode === 'sky') {
+        const ang = flAng.current + flT.current * 0.05
+        tPos.current.set(bx + Math.cos(ang) * SKY_R, SKY_Y, bz + Math.sin(ang) * SKY_R)
+        tLook.current.set(bx, 9, bz)
+        scene.fog = null; scene.background = null
+      } else { // descend — fall back to the sea
+        const p = Math.min(flT.current / 3.0, 1)
+        const e = p * p
+        const c = Math.cos(b.heading), s = Math.sin(b.heading)
+        const ox = -42, oy = 13, oz = 16
+        const hx = bx + ox * c + oz * s, hz = bz - ox * s + oz * c
+        tPos.current.set(lrp(flStart.current.x, hx, e), lrp(SKY_Y, oy, e), lrp(flStart.current.z, hz, e))
+        tLook.current.set(bx, lrp(9, 2.5, e), bz)
+        scene.fog = null; scene.background = null
+      }
+      camera.position.lerp(tPos.current, 1 - Math.exp(-dt / (fmode === 'sky' ? 0.6 : 0.16)))
+      camera.lookAt(tLook.current)
+      return
+    }
+
+    // ── Boat physics (sailable only at the hero) ──
+    const CRUISE = 2.4 // baseline headway so the yacht is always making way
+    if (sp < 0.03) {
+      if (keys.current['ArrowLeft'])  b.heading += dt * 0.9
+      if (keys.current['ArrowRight']) b.heading -= dt * 0.9
+      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + dt * 1.5, 12)
+      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - dt * 2.2,  0)
+      // always cruise unless the helmsman is actively braking
+      if (!keys.current['ArrowDown']) b.targetSpeed = Math.max(b.targetSpeed, CRUISE)
+    }
+    b.targetSpeed *= 0.996
+    b.speed += (b.targetSpeed - b.speed) * 0.05
+    // Move bow-first: the hull's bow points along local +x
+    b.pos.x += Math.cos(b.heading) * b.speed * dt
+    b.pos.z -= Math.sin(b.heading) * b.speed * dt
 
     // Boat-space → world-space (matches the yacht group's transform)
     const setPoint = (node, arr, out) => {
@@ -471,15 +538,17 @@ function SceneController({ scrollRef, boatStateRef }) {
     let segI = 0, segT = 0
 
     if (sp < 0.02) {
-      // Follow the boat from a 3/4 bow angle (matches PATH[0] framing)
+      // Chase the boat from astern so the bow leads into the horizon (matches PATH[0])
       const c = Math.cos(b.heading), s = Math.sin(b.heading)
-      const ox = 12, oz = 42
+      const ox = -42, oy = 13, oz = 16
       tPos.current.set(
         b.pos.x + ox * c + oz * s,
-        7,
+        oy,
         b.pos.z - ox * s + oz * c,
       )
-      tLook.current.set(b.pos.x, 4.5, b.pos.z)
+      // look ahead, over the bow (local +x is forward)
+      const lx = 16, ly = 2.5
+      tLook.current.set(b.pos.x + lx * c, ly, b.pos.z - lx * s)
     } else {
       let i = 0
       while (i < PATH.length - 2 && sp > PATH[i + 1].at) i++
@@ -493,7 +562,8 @@ function SceneController({ scrollRef, boatStateRef }) {
       segI = i; segT = zp
     }
 
-    camera.position.lerp(tPos.current, 0.028)
+    // Frame-rate-independent damping toward the target (TAU ≈ 0.25s)
+    camera.position.lerp(tPos.current, 1 - Math.exp(-dt / 0.25))
     camera.lookAt(tLook.current)
 
     // ── Scene fog / bg ──
@@ -515,7 +585,7 @@ function SceneController({ scrollRef, boatStateRef }) {
 }
 
 // ─── MAIN CANVAS ─────────────────────────────────────────────
-export function Scene3D({ scrollRef }) {
+export function Scene3D({ scrollRef, flightRef }) {
   // Boat state shared between Yacht3D, BoatWake, and SceneController
   const boatStateRef = useRef({
     pos: new THREE.Vector3(0, 0, 0),
@@ -526,7 +596,7 @@ export function Scene3D({ scrollRef }) {
 
   return (
     <Canvas
-      camera={{ position: [12, 7.0, 42], fov: 54, near: 0.1, far: 2000 }}
+      camera={{ position: [-42, 13, 16], fov: 54, near: 0.1, far: 2000 }}
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       shadows
       dpr={[1, 1.8]}
@@ -567,7 +637,7 @@ export function Scene3D({ scrollRef }) {
         <MarineLife scrollRef={scrollRef} />
       </Suspense>
 
-      <SceneController scrollRef={scrollRef} boatStateRef={boatStateRef} />
+      <SceneController scrollRef={scrollRef} boatStateRef={boatStateRef} flightRef={flightRef} />
     </Canvas>
   )
 }

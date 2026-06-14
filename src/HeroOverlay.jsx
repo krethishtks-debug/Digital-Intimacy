@@ -1,4 +1,24 @@
+import { useState } from 'react'
+
+// Small keycap chip used in the helm-controls popup
+function KeyCap({ children, wide }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      minWidth: wide ? 'auto' : 26, height: 26, padding: wide ? '0 10px' : '0 6px',
+      fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', fontWeight: 500,
+      color: '#dff4ff',
+      background: 'rgba(0,180,216,0.16)',
+      border: '1px solid rgba(0,210,240,0.5)',
+      borderRadius: 5,
+      boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.06)',
+    }}>{children}</span>
+  )
+}
+
 export function HeroOverlay({ onDive }) {
+  const [showControls, setShowControls] = useState(true)
+
   const handleDive = () => {
     onDive?.()
     const target = document.getElementById('zone-1')
@@ -68,7 +88,7 @@ export function HeroOverlay({ onDive }) {
         </h1>
 
         {/* Subtitle lines */}
-        <div style={{ marginBottom: '2.4rem' }}>
+        <div style={{ marginBottom: '2.4rem', maxWidth: 'min(62ch, 96%)' }}>
           <p style={{
             fontFamily: '"Inter Tight", sans-serif',
             fontWeight: 300,
@@ -160,22 +180,95 @@ export function HeroOverlay({ onDive }) {
 
           <p style={{
             fontFamily: '"JetBrains Mono", monospace',
-            fontSize: '0.60rem',
+            fontSize: '0.64rem',
             letterSpacing: '0.22em',
             textTransform: 'uppercase',
-            color: 'rgba(150,190,210,0.35)',
+            color: 'rgba(190,225,240,0.62)',
           }}>
-            Scroll to dive
+            or scroll to dive
           </p>
         </div>
       </div>
 
-      {/* Bounce arrow animation */}
+      {/* ── Helm controls popup (states the arrow-key sailing feature) ── */}
+      {showControls && (
+        <div
+          className="controls-pop pointer-events-auto"
+          style={{
+            position: 'absolute',
+            right: 'clamp(1.25rem, 4vw, 2.5rem)',
+            top: 'clamp(6rem, 14vh, 8rem)',
+            zIndex: 20,
+            width: 'min(290px, 72vw)',
+            padding: '1.1rem 1.2rem 1.2rem',
+            background: 'rgba(3,12,24,0.62)',
+            backdropFilter: 'blur(16px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+            border: '1px solid rgba(0,180,216,0.32)',
+            borderRadius: 14,
+            boxShadow: '0 18px 50px rgba(0,0,0,0.55), 0 0 36px rgba(0,180,216,0.08)',
+          }}
+        >
+          <button
+            onClick={() => setShowControls(false)}
+            aria-label="Dismiss controls"
+            style={{
+              position: 'absolute', top: 8, right: 8, width: 26, height: 26,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 7, color: 'rgba(200,225,235,0.75)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1,
+            }}
+          >×</button>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.95rem',
+          }}>
+            <span aria-hidden="true" style={{ fontSize: '0.95rem' }}>🛥️</span>
+            <span style={{
+              fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem',
+              letterSpacing: '0.26em', textTransform: 'uppercase', color: 'rgba(0,210,240,0.9)',
+            }}>Helm Controls</span>
+          </div>
+
+          {[
+            { keys: ['↑', '↓'], label: 'Sail the yacht' },
+            { keys: ['←', '→'], label: 'Steer' },
+          ].map(({ keys, label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.7rem' }}>
+              <span style={{ display: 'inline-flex', gap: 4 }}>
+                {keys.map(k => <KeyCap key={k}>{k}</KeyCap>)}
+              </span>
+              <span style={{
+                fontFamily: '"Inter Tight", sans-serif', fontSize: '0.86rem', fontWeight: 400,
+                color: 'rgba(214,236,246,0.92)',
+              }}>{label}</span>
+            </div>
+          ))}
+
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0.5rem 0 0.8rem' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <KeyCap wide>Scroll</KeyCap>
+            <span style={{
+              fontFamily: '"Inter Tight", sans-serif', fontSize: '0.86rem', fontWeight: 400,
+              color: 'rgba(214,236,246,0.92)',
+            }}>Descend into the deep</span>
+          </div>
+        </div>
+      )}
+
+      {/* Animations */}
       <style>{`
         @keyframes bounce-down {
           0%, 100% { transform: translateY(0); }
           50%       { transform: translateY(4px); }
         }
+        @keyframes controls-in {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .controls-pop { animation: controls-in 0.6s cubic-bezier(0.16,1,0.3,1) 0.5s both; }
+        @media (prefers-reduced-motion: reduce) { .controls-pop { animation: none; } }
       `}</style>
     </div>
   )

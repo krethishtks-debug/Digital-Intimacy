@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, Suspense } from 'react'
 import { Scene3D } from './Scene3D.jsx'
 import { HeroOverlay } from './HeroOverlay.jsx'
-import { ContentZones } from './ContentZones.jsx'
+import { ContentZones, BIBLIOGRAPHY } from './ContentZones.jsx'
 import { Navbar } from './Navbar.jsx'
 import { HUD } from './HUD.jsx'
 
@@ -78,12 +78,121 @@ function TeacherHeader() {
   )
 }
 
+// ─── Sky citations overlay (the "reverse whirlpool" destination) ──
+function CitationsOverlay({ flight, onReturn, bibliography }) {
+  if (flight === 'none') return null
+  const inSky = flight === 'sky'
+  const transition = flight === 'launch' || flight === 'descend'
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 160, pointerEvents: inSky ? 'auto' : 'none', overflow: 'hidden' }}>
+      {/* mood / legibility vignette */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: inSky
+          ? 'radial-gradient(ellipse at 50% 36%, rgba(2,10,22,0) 28%, rgba(2,8,20,0.8) 100%)'
+          : 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 20%, rgba(0,4,12,0.62) 100%)',
+        transition: 'background 0.6s ease',
+      }} />
+
+      {/* whirlpool (launch) / dive rings (descend) */}
+      {transition && (
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div key={i} className={flight === 'launch' ? 'whirl-ring' : 'dive-ring'} style={{ animationDelay: `${i * 0.16}s` }} />
+          ))}
+          <div style={{
+            position: 'absolute', bottom: '13%',
+            fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', letterSpacing: '0.4em',
+            textTransform: 'uppercase', color: 'rgba(190,225,240,0.85)',
+          }}>{flight === 'launch' ? 'Surfacing' : 'Diving'}</div>
+        </div>
+      )}
+
+      {/* citations panel — fades in once in the sky */}
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', padding: 'clamp(1.5rem,4vw,3rem)',
+        opacity: inSky ? 1 : 0,
+        transform: inSky ? 'translateY(0)' : 'translateY(22px)',
+        transition: 'opacity 0.8s ease 0.15s, transform 0.8s cubic-bezier(0.16,1,0.3,1) 0.15s',
+        pointerEvents: inSky ? 'auto' : 'none',
+      }}>
+        <div style={{
+          width: 'min(760px, 100%)', maxHeight: '82vh', display: 'flex', flexDirection: 'column',
+          background: 'rgba(4,14,28,0.5)', backdropFilter: 'blur(18px) saturate(150%)', WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+          border: '1px solid rgba(120,200,180,0.3)', borderRadius: 18,
+          boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 50px rgba(82,183,136,0.1)', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '1.4rem 1.8rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(130,220,180,0.85)', marginBottom: '0.5rem' }}>
+              Above the Surface · {bibliography.length} Sources
+            </div>
+            <h2 style={{ fontFamily: '"Playfair Display", serif', fontSize: 'clamp(1.6rem,3.5vw,2.4rem)', fontWeight: 700, color: '#eafff6', lineHeight: 1 }}>
+              Bibliography
+            </h2>
+          </div>
+          <div style={{ padding: '1.4rem 1.8rem', overflowY: 'auto' }}>
+            {bibliography.map((entry, i) => (
+              <p key={i} style={{
+                fontFamily: '"Inter Tight", sans-serif', fontSize: '0.88rem', fontWeight: 400,
+                lineHeight: 1.7, color: 'rgba(212,234,228,0.88)',
+                marginBottom: '0.95rem', paddingLeft: '1.4rem', textIndent: '-1.4rem',
+              }}>{entry}</p>
+            ))}
+          </div>
+          <div style={{ padding: '1.1rem 1.8rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'center' }}>
+            <button onClick={onReturn} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 12, padding: '14px 30px', cursor: 'pointer',
+              background: 'linear-gradient(180deg, rgba(0,180,216,0.3), rgba(0,180,216,0.12))',
+              border: '1px solid rgba(0,210,240,0.6)', borderRadius: 10, color: '#eafdff',
+              fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', letterSpacing: '0.2em', textTransform: 'uppercase',
+              boxShadow: '0 0 22px rgba(0,180,216,0.25)',
+            }}>
+              <span aria-hidden="true">↓</span> Dive Back to the Sea
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        .whirl-ring, .dive-ring {
+          position: absolute; width: 42vmin; height: 42vmin; border-radius: 50%;
+          border: 1px solid rgba(120,210,235,0.5);
+          box-shadow: 0 0 30px rgba(0,180,216,0.25), inset 0 0 30px rgba(0,180,216,0.15);
+        }
+        .whirl-ring { animation: whirl 1.6s cubic-bezier(0.3,0,0.5,1) infinite; }
+        .dive-ring  { animation: dive  1.6s cubic-bezier(0.3,0,0.5,1) infinite; }
+        @keyframes whirl {
+          0%   { transform: scale(0.15) rotate(0deg);   opacity: 0; }
+          25%  { opacity: 0.8; }
+          100% { transform: scale(2.2) rotate(220deg);  opacity: 0; }
+        }
+        @keyframes dive {
+          0%   { transform: scale(2.2) rotate(0deg);    opacity: 0; }
+          25%  { opacity: 0.8; }
+          100% { transform: scale(0.15) rotate(-220deg); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .whirl-ring, .dive-ring { animation-duration: 0.01ms; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 export default function App() {
   // scrollRef is read every frame by Scene3D — no re-renders
   const scrollRef = useRef(0)
   // scrollDisplay is throttled state for UI components that need re-renders
   const [scrollDisplay, setScrollDisplay] = useState(0)
   const [teacher, setTeacher] = useState(false)
+
+  // sky-flight state (citations launch). flightRef is read per-frame by Scene3D.
+  const flightRef = useRef({ mode: 'none', t: 0 })
+  const [flight, setFlight] = useState('none')
+  const timers = useRef([])
+  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
+  const flying = flight !== 'none'
 
   useEffect(() => {
     let raf = null
@@ -102,9 +211,34 @@ export default function App() {
     return () => { window.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf) }
   }, [])
 
+  useEffect(() => () => clearTimers(), [])
+
   const toggleTeacher = () => {
     window.scrollTo(0, 0)
     setTeacher(t => !t)
+  }
+
+  // ── Citations flight: launch up to the sky, then dive back ──
+  const launchCitations = () => {
+    clearTimers()
+    document.body.style.overflow = 'hidden' // lock the page while airborne
+    flightRef.current = { mode: 'launch', t: 0 }
+    setFlight('launch')
+    timers.current.push(setTimeout(() => { flightRef.current.mode = 'sky'; setFlight('sky') }, 3400))
+  }
+  const returnToSea = () => {
+    clearTimers()
+    flightRef.current = { mode: 'descend', t: 0 }
+    setFlight('descend')
+    timers.current.push(setTimeout(() => {
+      scrollRef.current = 0
+      setScrollDisplay(0)
+      // instant (not smooth) so we don't replay the dive zones on the way up
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+      flightRef.current = { mode: 'none', t: 0 }
+      setFlight('none')
+      document.body.style.overflow = ''
+    }, 3000))
   }
 
   const Footer = (
@@ -144,29 +278,37 @@ export default function App() {
   // ── Immersive scroll experience ──
   return (
     <div style={{ background: '#000308' }}>
-      <ViewToggle teacher={false} onToggle={toggleTeacher} />
+      {!flying && <ViewToggle teacher={false} onToggle={toggleTeacher} />}
 
       {/* ── Fixed 3D Canvas behind everything ── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
         <Suspense fallback={null}>
-          <Scene3D scrollRef={scrollRef} />
+          <Scene3D scrollRef={scrollRef} flightRef={flightRef} />
         </Suspense>
       </div>
 
-      {/* ── Fixed HUD elements ── */}
-      <Navbar scrollProgress={scrollDisplay} />
-      <HUD scrollProgress={scrollDisplay} />
+      {/* ── Fixed HUD elements (hidden while airborne) ── */}
+      {!flying && <Navbar scrollProgress={scrollDisplay} />}
+      {!flying && <HUD scrollProgress={scrollDisplay} />}
 
-      {/* ── Scrollable content layer ── */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
+      {/* ── Scrollable content layer (fades out during the flight) ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        opacity: flying ? 0 : 1,
+        pointerEvents: flying ? 'none' : 'auto',
+        transition: 'opacity 0.6s ease',
+      }}>
         {/* Hero section — transparent background lets 3D canvas show through */}
         <HeroOverlay />
 
         {/* Content zones — each has semi-opaque dark background */}
-        <ContentZones />
+        <ContentZones onViewCitations={launchCitations} />
 
         {Footer}
       </div>
+
+      {/* ── Sky citations overlay ── */}
+      <CitationsOverlay flight={flight} onReturn={returnToSea} bibliography={BIBLIOGRAPHY} />
     </div>
   )
 }
