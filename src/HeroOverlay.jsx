@@ -111,7 +111,6 @@ export function HeroOverlay({ onDive }) {
               border: '1px solid rgba(0,210,240,0.55)',
               borderRadius: '2px',
               cursor: 'pointer',
-              outline: 'none',
               // Glow
               boxShadow: [
                 '0 0 20px rgba(0,180,216,0.25)',

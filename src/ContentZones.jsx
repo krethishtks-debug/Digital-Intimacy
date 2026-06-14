@@ -412,7 +412,7 @@ function Aquarium({ creatures, accent, onSelect }) {
           display:'flex', alignItems:'center', justifyContent:'center',
           fontSize:'1.8rem', fontWeight:700, paddingBottom:3,
           transition:'background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
-          outline:'none', lineHeight:1,
+          lineHeight:1,
           // gentle breathing scale to draw the eye (transform owned by the keyframe)
           animation: disabled ? 'none' : `arrow-pulse 1.9s ease-in-out infinite ${dir === 'left' ? '0s' : '0.95s'}`,
         }}
@@ -566,6 +566,7 @@ function OrbModal({ orb, accent, onClose }) {
       >
         <button
           onClick={onClose}
+          aria-label="Close"
           style={{
             position:'sticky', top:0, float:'right',
             background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)',
