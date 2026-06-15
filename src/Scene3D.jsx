@@ -449,11 +449,25 @@ function WakeSpray({ boatStateRef }) {
 }
 
 // ─── HELM CHALLENGE — sail through the gates (hero minigame) ──
+const GATES = 8
+// Random winding course: each gate a random heading/distance from the last,
+// well spread out (240–460 units apart). First gate sits roughly ahead.
+function makeCourse() {
+  const pts = []
+  let x = 0, z = 0, ang = (Math.random() - 0.5) * 0.5
+  for (let i = 0; i < GATES; i++) {
+    ang += (Math.random() - 0.5) * 1.5
+    const dist = 240 + Math.random() * 220
+    x += Math.cos(ang) * dist
+    z += -Math.sin(ang) * dist
+    pts.push({ x: Math.round(x), z: Math.round(z) })
+  }
+  return pts
+}
+
 function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
-  const COURSE = useMemo(() => [
-    { x: 120, z: 20   }, { x: 250, z: -85  }, { x: 195, z: -240 }, { x: 15,  z: -285 },
-    { x: -120,z: -165 }, { x: -100,z: 45   }, { x: 70,  z: 165  }, { x: 200, z: 90 },
-  ], [])
+  const courseRef = useRef(null)
+  if (!courseRef.current) courseRef.current = makeCourse()
   const groupRefs = useRef([])
   const beamRef   = useRef()
   const flashRef  = useRef()
@@ -477,25 +491,29 @@ function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
 
     if (g.resetRequested) {
       S.current = { idx: 0, collected: 0, started: false, startT: 0, done: false, finalTime: 0, flashT: -10 }
+      courseRef.current = makeCourse() // fresh random course each race
       g.engaged = false // bring the hero text back when re-racing
       g.resetRequested = false
     }
     const st = S.current
+    const course = courseRef.current
 
     // ── collision detection against the current gate ──
-    if (atHero && !st.done && st.idx < COURSE.length) {
-      const c = COURSE[st.idx]
-      if (Math.hypot(b.pos.x - c.x, b.pos.z - c.z) < 18) {
+    if (atHero && !st.done && st.idx < GATES) {
+      const c = course[st.idx]
+      if (Math.hypot(b.pos.x - c.x, b.pos.z - c.z) < 20) {
         if (st.idx === 0) { st.started = true; st.startT = t } // first gate starts the clock
         st.idx++; st.collected++; st.flashT = t
         if (flashRef.current) flashRef.current.position.set(c.x, 0.5, c.z)
-        if (st.idx >= COURSE.length) { st.done = true; st.finalTime = t - st.startT }
+        if (st.idx >= GATES) { st.done = true; st.finalTime = t - st.startT }
       }
     }
 
     // ── gate visuals ──
     groupRefs.current.forEach((grp, i) => {
       if (!grp) return
+      const c = course[i]
+      grp.position.x = c.x; grp.position.z = c.z
       grp.visible = atHero && i >= st.idx
       if (!grp.visible) return
       grp.position.y = Math.sin(t * 1.4 + i) * 0.4
@@ -510,9 +528,9 @@ function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
 
     // ── guiding light beam at the current gate ──
     if (beamRef.current) {
-      const show = atHero && !st.done && st.idx < COURSE.length
+      const show = atHero && !st.done && st.idx < GATES
       beamRef.current.visible = show
-      if (show) { const c = COURSE[st.idx]; beamRef.current.position.set(c.x, 22, c.z) }
+      if (show) { const c = course[st.idx]; beamRef.current.position.set(c.x, 22, c.z) }
     }
 
     // ── collect flash ──
@@ -526,7 +544,7 @@ function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
     g.active = atHero
     g.idx = st.idx
     g.collected = st.collected
-    g.total = COURSE.length
+    g.total = GATES
     g.done = st.done
     g.started = st.started
     g.elapsed = st.done ? st.finalTime : (st.started ? t - st.startT : 0)
@@ -535,8 +553,8 @@ function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
 
   return (
     <group>
-      {COURSE.map((c, i) => (
-        <group key={i} ref={el => (groupRefs.current[i] = el)} position={[c.x, 0, c.z]} visible={false}>
+      {Array.from({ length: GATES }).map((_, i) => (
+        <group key={i} ref={el => (groupRefs.current[i] = el)} visible={false}>
           <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.4, 0]} material={mats.ringNext}>
             <torusGeometry args={[15, 0.85, 10, 36]} />
           </mesh>
@@ -701,7 +719,7 @@ function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
     }
 
     // ── Boat physics (sailable only at the hero) ──
-    const CRUISE = 4.0 // baseline headway so the yacht is always making way
+    const CRUISE = 5.0 // baseline headway so the yacht is always making way
     if (sp < 0.03) {
       const k = keys.current
       if (gameRef?.current) {
@@ -709,22 +727,27 @@ function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
         // first arrow press "engages" the helm → hero text clears for the race
         if (!g.engaged && (k['ArrowUp'] || k['ArrowDown'] || k['ArrowLeft'] || k['ArrowRight'])) g.engaged = true
         // steering hard at speed throws spray against the lens
-        g.turn = (k['ArrowLeft'] || k['ArrowRight']) && b.speed > 6 ? Math.min(b.speed / 20, 1) : 0
+        g.turn = (k['ArrowLeft'] || k['ArrowRight']) && b.speed > 8 ? Math.min(b.speed / 45, 1) : 0
         if (k['ArrowLeft']) g.turnSide = 'left'
         else if (k['ArrowRight']) g.turnSide = 'right'
       }
-      if (keys.current['ArrowLeft'])  b.heading += dt * 1.1
-      if (keys.current['ArrowRight']) b.heading -= dt * 1.1
-      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + dt * 5.0, 26)
-      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - dt * 6.0,  0)
+      if (keys.current['ArrowLeft'])  b.heading += dt * 1.35
+      if (keys.current['ArrowRight']) b.heading -= dt * 1.35
+      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + dt * 12, 55)
+      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - dt * 16,  0)
       // always cruise unless the helmsman is actively braking
       if (!keys.current['ArrowDown']) b.targetSpeed = Math.max(b.targetSpeed, CRUISE)
     }
-    b.targetSpeed *= 0.997
-    b.speed += (b.targetSpeed - b.speed) * 0.08
-    // Move bow-first: the hull's bow points along local +x
-    b.pos.x += Math.cos(b.heading) * b.speed * dt
-    b.pos.z -= Math.sin(b.heading) * b.speed * dt
+    b.targetSpeed *= 0.998
+    b.speed += (b.targetSpeed - b.speed) * 0.1
+    // Drift: the bow (heading) leads, the course (velocity) lags behind it —
+    // grip falls off with speed, so hard turns at speed make the stern slide out.
+    const angDiff = Math.atan2(Math.sin(b.heading - b.course), Math.cos(b.heading - b.course))
+    const grip = Math.max(1.4, 6 - b.speed * 0.09)
+    b.course += angDiff * Math.min(1, grip * dt)
+    // Travel along the course (hull bow = local +x)
+    b.pos.x += Math.cos(b.course) * b.speed * dt
+    b.pos.z -= Math.sin(b.course) * b.speed * dt
 
     // Boat-space → world-space (matches the yacht group's transform)
     const setPoint = (node, arr, out) => {
@@ -740,23 +763,19 @@ function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
     // ── Camera ──
     let segI = 0, segT = 0
 
-    if (sp < 0.02) {
+    const racing = gameRef?.current?.engaged && !gameRef.current.done
+    if (sp < 0.02 && racing) {
+      // Action chase: low and directly behind the direction of travel (course),
+      // so a drift reads as the boat kicking out sideways in front of the lens.
+      const cc = Math.cos(b.course), sc = Math.sin(b.course)
+      const dist = 30, height = 8.5
+      tPos.current.set(b.pos.x - cc * dist, height, b.pos.z + sc * dist)
+      tLook.current.set(b.pos.x + cc * 14, 5.5, b.pos.z - sc * 14)
+    } else if (sp < 0.02) {
+      // Cinematic stern chase with the bow leading to the horizon (matches PATH[0]).
       const c = Math.cos(b.heading), s = Math.sin(b.heading)
-      // While racing the helm challenge: a higher, pulled-in chase that keeps
-      // the ship centred for navigation. Otherwise the cinematic stern chase
-      // with the bow leading to the horizon (and back to it once completed).
-      const racing = gameRef?.current?.engaged && !gameRef.current.done
-      const ox = racing ? -36 : -42
-      const oy = racing ?  20 :  13
-      const oz = racing ?  12 :  16
-      const lx = racing ?   4 :  16
-      const ly = racing ?   3 : 2.5
-      tPos.current.set(
-        b.pos.x + ox * c + oz * s,
-        oy,
-        b.pos.z - ox * s + oz * c,
-      )
-      tLook.current.set(b.pos.x + lx * c, ly, b.pos.z - lx * s)
+      tPos.current.set(b.pos.x - 42 * c + 16 * s, 13, b.pos.z + 42 * s + 16 * c)
+      tLook.current.set(b.pos.x + 16 * c, 2.5, b.pos.z - 16 * s)
     } else {
       let i = 0
       while (i < PATH.length - 2 && sp > PATH[i + 1].at) i++
@@ -797,7 +816,8 @@ export function Scene3D({ scrollRef, flightRef, gameRef }) {
   // Boat state shared between Yacht3D, BoatWake, and SceneController
   const boatStateRef = useRef({
     pos: new THREE.Vector3(0, 0, 0),
-    heading: 0,
+    heading: 0,   // where the bow points (steering)
+    course: 0,    // direction actually travelled (lags heading → drift)
     speed: 0,
     targetSpeed: 0,
   })
