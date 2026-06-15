@@ -143,10 +143,10 @@ export function Yacht3D({ boatStateRef }) {
     // Heavy-tonnage buoyancy (hull long axis = local x: roll = rot.x, pitch = rot.z)
     const spd = boatStateRef?.current?.speed ?? 0
     const heave = Math.cos(t * 0.6) * 0.04 + Math.sin(t * 0.38) * 0.05
-    groupRef.current.position.y = heave + Math.min(spd, 6) * 0.012   // rides a touch higher underway
-    groupRef.current.rotation.x = Math.sin(t * 0.45) * 0.010         // gentle roll
-    // pitch: idle sway + a slight bow-rise as it makes way through the swell
-    groupRef.current.rotation.z = Math.cos(t * 0.33) * 0.008 + Math.min(spd, 6) * 0.004
+    groupRef.current.position.y = heave + Math.min(spd, 14) * 0.012   // rides higher the faster it goes
+    groupRef.current.rotation.x = Math.sin(t * 0.45) * 0.010          // gentle roll
+    // pitch: idle sway + a bow-rise that grows with speed (planing)
+    groupRef.current.rotation.z = Math.cos(t * 0.33) * 0.008 + Math.min(spd, 14) * 0.004
   })
 
   const hull   = m.hull

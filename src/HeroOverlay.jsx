@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Small keycap chip used in the helm-controls popup
 function KeyCap({ children, wide }) {
@@ -16,8 +16,19 @@ function KeyCap({ children, wide }) {
   )
 }
 
-export function HeroOverlay({ onDive }) {
+export function HeroOverlay({ onDive, gameRef }) {
   const [showControls, setShowControls] = useState(true)
+  // Hide the editorial text while the helm challenge is being raced;
+  // bring it back once the course is complete (or before the race starts).
+  const [hideText, setHideText] = useState(false)
+  useEffect(() => {
+    if (!gameRef) return
+    const iv = setInterval(() => {
+      const g = gameRef.current
+      setHideText(!!(g && g.engaged && !g.done))
+    }, 120)
+    return () => clearInterval(iv)
+  }, [gameRef])
 
   const handleDive = () => {
     onDive?.()
@@ -42,10 +53,16 @@ export function HeroOverlay({ onDive }) {
         }}
       />
 
-      {/* Text block */}
+      {/* Text block — fades away while racing the helm challenge */}
       <div
-        className="relative z-10 pointer-events-auto"
-        style={{ padding: '0 clamp(2rem, 6vw, 7rem) 5rem' }}
+        className="relative z-10"
+        style={{
+          padding: '0 clamp(2rem, 6vw, 7rem) 5rem',
+          opacity: hideText ? 0 : 1,
+          transform: hideText ? 'translateY(14px)' : 'translateY(0)',
+          transition: 'opacity 0.6s ease, transform 0.6s ease',
+          pointerEvents: hideText ? 'none' : 'auto',
+        }}
       >
         {/* Eyebrow */}
         <div
@@ -191,7 +208,7 @@ export function HeroOverlay({ onDive }) {
       </div>
 
       {/* ── Helm controls popup (states the arrow-key sailing feature) ── */}
-      {showControls && (
+      {showControls && !hideText && (
         <div
           className="controls-pop pointer-events-auto"
           style={{

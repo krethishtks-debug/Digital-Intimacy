@@ -362,6 +362,113 @@ function BoatWake({ boatStateRef }) {
   )
 }
 
+// ─── HELM CHALLENGE — sail through the gates (hero minigame) ──
+function Checkpoints({ boatStateRef, scrollRef, gameRef }) {
+  const COURSE = useMemo(() => [
+    { x: 120, z: 20   }, { x: 250, z: -85  }, { x: 195, z: -240 }, { x: 15,  z: -285 },
+    { x: -120,z: -165 }, { x: -100,z: 45   }, { x: 70,  z: 165  }, { x: 200, z: 90 },
+  ], [])
+  const groupRefs = useRef([])
+  const beamRef   = useRef()
+  const flashRef  = useRef()
+  const S = useRef({ idx: 0, collected: 0, started: false, startT: 0, done: false, finalTime: 0, flashT: -10 })
+
+  const mats = useMemo(() => ({
+    ringCur:  new THREE.MeshStandardMaterial({ color: 0x00e0ff, emissive: new THREE.Color(0x00c4f0), emissiveIntensity: 2.4, transparent: true, opacity: 0.92 }),
+    ringNext: new THREE.MeshStandardMaterial({ color: 0xc9a84c, emissive: new THREE.Color(0xc9a84c), emissiveIntensity: 0.6, transparent: true, opacity: 0.5 }),
+    buoyCur:  new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: new THREE.Color(0x00e0ff), emissiveIntensity: 2.6 }),
+    buoyNext: new THREE.MeshStandardMaterial({ color: 0xc9a84c, emissive: new THREE.Color(0xc9a84c), emissiveIntensity: 0.7 }),
+    beam:  new THREE.MeshBasicMaterial({ color: 0x66ecff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }),
+    flash: new THREE.MeshBasicMaterial({ color: 0xbfffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }),
+  }), [])
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    const b = boatStateRef.current
+    const g = gameRef?.current
+    if (!g) return
+    const atHero = scrollRef.current < 0.045
+
+    if (g.resetRequested) {
+      S.current = { idx: 0, collected: 0, started: false, startT: 0, done: false, finalTime: 0, flashT: -10 }
+      g.engaged = false // bring the hero text back when re-racing
+      g.resetRequested = false
+    }
+    const st = S.current
+
+    // ── collision detection against the current gate ──
+    if (atHero && !st.done && st.idx < COURSE.length) {
+      const c = COURSE[st.idx]
+      if (Math.hypot(b.pos.x - c.x, b.pos.z - c.z) < 18) {
+        if (st.idx === 0) { st.started = true; st.startT = t } // first gate starts the clock
+        st.idx++; st.collected++; st.flashT = t
+        if (flashRef.current) flashRef.current.position.set(c.x, 0.5, c.z)
+        if (st.idx >= COURSE.length) { st.done = true; st.finalTime = t - st.startT }
+      }
+    }
+
+    // ── gate visuals ──
+    groupRefs.current.forEach((grp, i) => {
+      if (!grp) return
+      grp.visible = atHero && i >= st.idx
+      if (!grp.visible) return
+      grp.position.y = Math.sin(t * 1.4 + i) * 0.4
+      grp.rotation.y = t * 0.5 + i
+      const isCur = i === st.idx
+      grp.children.forEach(ch => {
+        ch.material = ch.geometry.type === 'TorusGeometry'
+          ? (isCur ? mats.ringCur : mats.ringNext)
+          : (isCur ? mats.buoyCur : mats.buoyNext)
+      })
+    })
+
+    // ── guiding light beam at the current gate ──
+    if (beamRef.current) {
+      const show = atHero && !st.done && st.idx < COURSE.length
+      beamRef.current.visible = show
+      if (show) { const c = COURSE[st.idx]; beamRef.current.position.set(c.x, 22, c.z) }
+    }
+
+    // ── collect flash ──
+    if (flashRef.current) {
+      const dtf = t - st.flashT
+      if (dtf >= 0 && dtf < 0.6) { const p = dtf / 0.6; flashRef.current.visible = true; flashRef.current.scale.setScalar(1 + p * 5); mats.flash.opacity = (1 - p) * 0.85 }
+      else flashRef.current.visible = false
+    }
+
+    // ── mirror state to the HUD ──
+    g.active = atHero
+    g.idx = st.idx
+    g.collected = st.collected
+    g.total = COURSE.length
+    g.done = st.done
+    g.started = st.started
+    g.elapsed = st.done ? st.finalTime : (st.started ? t - st.startT : 0)
+    g.speed = b.speed
+  })
+
+  return (
+    <group>
+      {COURSE.map((c, i) => (
+        <group key={i} ref={el => (groupRefs.current[i] = el)} position={[c.x, 0, c.z]} visible={false}>
+          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.4, 0]} material={mats.ringNext}>
+            <torusGeometry args={[15, 0.85, 10, 36]} />
+          </mesh>
+          <mesh position={[0, 2.6, 0]} material={mats.buoyNext}>
+            <coneGeometry args={[1.3, 5.2, 10]} />
+          </mesh>
+        </group>
+      ))}
+      <mesh ref={beamRef} material={mats.beam} visible={false}>
+        <cylinderGeometry args={[2.4, 2.4, 44, 14, 1, true]} />
+      </mesh>
+      <mesh ref={flashRef} material={mats.flash} rotation={[Math.PI / 2, 0, 0]} visible={false}>
+        <torusGeometry args={[15, 1.6, 8, 32]} />
+      </mesh>
+    </group>
+  )
+}
+
 // ─── UNDERWATER PARTICLES ────────────────────────────────────
 function UnderwaterParticles({ scrollRef }) {
   const ref = useRef()
@@ -423,7 +530,7 @@ function OceanFloor({ scrollRef }) {
 }
 
 // ─── SCENE CONTROLLER (camera + keyboard + boat physics) ─────
-function SceneController({ scrollRef, boatStateRef, flightRef }) {
+function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
   const { camera, scene } = useThree()
   const tPos  = useRef(new THREE.Vector3(-42, 13, 16))
   const tLook = useRef(new THREE.Vector3(16, 2.5, 0))
@@ -508,17 +615,22 @@ function SceneController({ scrollRef, boatStateRef, flightRef }) {
     }
 
     // ── Boat physics (sailable only at the hero) ──
-    const CRUISE = 2.4 // baseline headway so the yacht is always making way
+    const CRUISE = 4.0 // baseline headway so the yacht is always making way
     if (sp < 0.03) {
-      if (keys.current['ArrowLeft'])  b.heading += dt * 0.9
-      if (keys.current['ArrowRight']) b.heading -= dt * 0.9
-      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + dt * 1.5, 12)
-      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - dt * 2.2,  0)
+      const k = keys.current
+      // first arrow press "engages" the helm → hero text clears for the race
+      if (gameRef?.current && !gameRef.current.engaged && (k['ArrowUp'] || k['ArrowDown'] || k['ArrowLeft'] || k['ArrowRight'])) {
+        gameRef.current.engaged = true
+      }
+      if (keys.current['ArrowLeft'])  b.heading += dt * 1.1
+      if (keys.current['ArrowRight']) b.heading -= dt * 1.1
+      if (keys.current['ArrowUp'])    b.targetSpeed = Math.min(b.targetSpeed + dt * 5.0, 26)
+      if (keys.current['ArrowDown'])  b.targetSpeed = Math.max(b.targetSpeed - dt * 6.0,  0)
       // always cruise unless the helmsman is actively braking
       if (!keys.current['ArrowDown']) b.targetSpeed = Math.max(b.targetSpeed, CRUISE)
     }
-    b.targetSpeed *= 0.996
-    b.speed += (b.targetSpeed - b.speed) * 0.05
+    b.targetSpeed *= 0.997
+    b.speed += (b.targetSpeed - b.speed) * 0.08
     // Move bow-first: the hull's bow points along local +x
     b.pos.x += Math.cos(b.heading) * b.speed * dt
     b.pos.z -= Math.sin(b.heading) * b.speed * dt
@@ -585,7 +697,7 @@ function SceneController({ scrollRef, boatStateRef, flightRef }) {
 }
 
 // ─── MAIN CANVAS ─────────────────────────────────────────────
-export function Scene3D({ scrollRef, flightRef }) {
+export function Scene3D({ scrollRef, flightRef, gameRef }) {
   // Boat state shared between Yacht3D, BoatWake, and SceneController
   const boatStateRef = useRef({
     pos: new THREE.Vector3(0, 0, 0),
@@ -632,12 +744,13 @@ export function Scene3D({ scrollRef, flightRef }) {
         <OceanWater />
         <Yacht3D boatStateRef={boatStateRef} />
         <BoatWake boatStateRef={boatStateRef} />
+        <Checkpoints boatStateRef={boatStateRef} scrollRef={scrollRef} gameRef={gameRef} />
         <UnderwaterParticles scrollRef={scrollRef} />
         <OceanFloor scrollRef={scrollRef} />
         <MarineLife scrollRef={scrollRef} />
       </Suspense>
 
-      <SceneController scrollRef={scrollRef} boatStateRef={boatStateRef} flightRef={flightRef} />
+      <SceneController scrollRef={scrollRef} boatStateRef={boatStateRef} flightRef={flightRef} gameRef={gameRef} />
     </Canvas>
   )
 }

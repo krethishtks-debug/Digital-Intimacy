@@ -4,6 +4,7 @@ import { HeroOverlay } from './HeroOverlay.jsx'
 import { ContentZones, BIBLIOGRAPHY } from './ContentZones.jsx'
 import { Navbar } from './Navbar.jsx'
 import { HUD } from './HUD.jsx'
+import { MinigameHUD } from './MinigameHUD.jsx'
 
 // ─── Floating toggle: immersive ↔ teacher/static view ───────────
 function ViewToggle({ teacher, onToggle, onPrint }) {
@@ -190,6 +191,8 @@ export default function App() {
   // sky-flight state (citations launch). flightRef is read per-frame by Scene3D.
   const flightRef = useRef({ mode: 'none', t: 0 })
   const [flight, setFlight] = useState('none')
+  // helm-challenge minigame state, read per-frame by Scene3D's Checkpoints
+  const gameRef = useRef({ active: false, idx: 0, collected: 0, total: 8, started: false, elapsed: 0, done: false, speed: 0, engaged: false, resetRequested: false })
   const timers = useRef([])
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
   const flying = flight !== 'none'
@@ -283,13 +286,14 @@ export default function App() {
       {/* ── Fixed 3D Canvas behind everything ── */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
         <Suspense fallback={null}>
-          <Scene3D scrollRef={scrollRef} flightRef={flightRef} />
+          <Scene3D scrollRef={scrollRef} flightRef={flightRef} gameRef={gameRef} />
         </Suspense>
       </div>
 
       {/* ── Fixed HUD elements (hidden while airborne) ── */}
       {!flying && <Navbar scrollProgress={scrollDisplay} />}
       {!flying && <HUD scrollProgress={scrollDisplay} />}
+      {!flying && <MinigameHUD gameRef={gameRef} />}
 
       {/* ── Scrollable content layer (fades out during the flight) ── */}
       <div style={{
@@ -299,7 +303,7 @@ export default function App() {
         transition: 'opacity 0.6s ease',
       }}>
         {/* Hero section — transparent background lets 3D canvas show through */}
-        <HeroOverlay />
+        <HeroOverlay gameRef={gameRef} />
 
         {/* Content zones — each has semi-opaque dark background */}
         <ContentZones onViewCitations={launchCitations} />
