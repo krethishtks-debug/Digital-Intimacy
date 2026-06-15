@@ -337,29 +337,115 @@ function MarineLife({ scrollRef }) {
   )
 }
 
-// ─── WAKE EFFECT ─────────────────────────────────────────────
-function BoatWake({ boatStateRef }) {
-  const ref = useRef()
-  useFrame(() => {
-    if (!ref.current || !boatStateRef?.current) return
-    const b = boatStateRef.current
-    const c = Math.cos(b.heading), s = Math.sin(b.heading)
-    // Trail behind the stern (hull bow points +x, so the stern is −x)
-    ref.current.position.x = b.pos.x - c * 15
-    ref.current.position.z = b.pos.z + s * 15
-    ref.current.rotation.y = b.heading + Math.PI / 2
+// ─── WAKE SPRAY ──────────────────────────────────────────────
+// Soft round foam sprite (radial gradient on a canvas)
+function makeFoamTexture() {
+  const s = 64
+  const c = document.createElement('canvas'); c.width = c.height = s
+  const ctx = c.getContext('2d')
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+  g.addColorStop(0,    'rgba(255,255,255,1)')
+  g.addColorStop(0.45, 'rgba(232,244,250,0.55)')
+  g.addColorStop(1,    'rgba(232,244,250,0)')
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s)
+  const tex = new THREE.CanvasTexture(c)
+  tex.needsUpdate = true
+  return tex
+}
+
+// Particle wake + bow spray that scales with boat speed — replaces the cone.
+function WakeSpray({ boatStateRef }) {
+  const COUNT = 600
+  const buf = useMemo(() => {
+    const o = {
+      pos: new Float32Array(COUNT * 3), vel: new Float32Array(COUNT * 3),
+      life: new Float32Array(COUNT), max: new Float32Array(COUNT), head: 0,
+    }
+    for (let i = 0; i < COUNT; i++) o.pos[i * 3 + 1] = -9999
+    return o
+  }, [])
+  const aLife = useMemo(() => new Float32Array(COUNT), [])
+  const tex = useMemo(makeFoamTexture, [])
+
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(buf.pos, 3))
+    g.setAttribute('aLife', new THREE.BufferAttribute(aLife, 1))
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6)
+    return g
+  }, [buf, aLife])
+
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: tex }, uColor: { value: new THREE.Color(0xffffff) }, uSize: { value: 6.0 } },
+    vertexShader: `
+      attribute float aLife; varying float vLife; uniform float uSize;
+      void main(){
+        vLife = aLife;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float grow = 1.0 + (1.0 - aLife) * 1.8;          // mist spreads as it ages
+        gl_PointSize = clamp(uSize * grow * (200.0 / -mv.z), 1.0, 130.0);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform sampler2D uTex; uniform vec3 uColor; varying float vLife;
+      void main(){
+        vec4 t = texture2D(uTex, gl_PointCoord);
+        float fade = smoothstep(0.0, 0.14, vLife) * vLife;  // quick fade-in, linear fade-out
+        float a = t.a * fade;
+        if (a < 0.01) discard;
+        gl_FragColor = vec4(uColor, a * 0.92);
+      }`,
+    transparent: true, depthWrite: false,
+  }), [tex])
+
+  useFrame((_, delta) => {
+    const b = boatStateRef?.current
+    if (!b) return
+    const dt = Math.min(delta, 0.05)
     const spd = b.speed
-    ref.current.scale.setScalar(Math.min(1.15, spd * 0.16 + 0.30))
-    ref.current.material.opacity = Math.min(0.5, spd * 0.12 + 0.05)
+    const c = Math.cos(b.heading), s = Math.sin(b.heading)
+    const sternX = b.pos.x - c * 14, sternZ = b.pos.z + s * 14
+    const bowX = b.pos.x + c * 15, bowZ = b.pos.z - s * 15
+
+    // emit (rate scales with speed; lateral axis = local +z = (s, c))
+    const emit = Math.min(24, Math.floor(spd * 1.6))
+    for (let e = 0; e < emit; e++) {
+      const i = buf.head; buf.head = (buf.head + 1) % COUNT
+      const k = i * 3
+      const lat = (Math.random() - 0.5) * 9
+      if (spd > 11 && Math.random() < 0.28) {
+        // bow spray — kicks up and out ahead
+        buf.pos[k] = bowX + s * lat * 0.5; buf.pos[k + 1] = 0.6 + Math.random() * 0.6; buf.pos[k + 2] = bowZ + c * lat * 0.5
+        buf.vel[k]     = c * spd * 0.12 + s * Math.sign(lat) * 2.6 + (Math.random() - 0.5)
+        buf.vel[k + 1] = 3.0 + Math.random() * 3.2
+        buf.vel[k + 2] = -s * spd * 0.12 + c * Math.sign(lat) * 2.6 + (Math.random() - 0.5)
+      } else {
+        // stern wake — churns up into mist, spreads into a V, and lingers near the boat
+        buf.pos[k] = sternX + s * lat; buf.pos[k + 1] = 0.4 + Math.random() * 0.5; buf.pos[k + 2] = sternZ + c * lat
+        buf.vel[k]     = -c * spd * 0.05 + s * lat * 0.5 + (Math.random() - 0.5)
+        buf.vel[k + 1] = 1.6 + Math.random() * 2.6
+        buf.vel[k + 2] = s * spd * 0.05 + c * lat * 0.5 + (Math.random() - 0.5)
+      }
+      const life = 1.2 + Math.random() * 1.2
+      buf.life[i] = life; buf.max[i] = life
+    }
+
+    // integrate
+    for (let i = 0; i < COUNT; i++) {
+      if (buf.life[i] <= 0) { aLife[i] = 0; continue }
+      buf.life[i] -= dt
+      const k = i * 3
+      buf.vel[k + 1] -= 3.4 * dt                 // gravity
+      buf.vel[k] *= 0.95; buf.vel[k + 1] *= 0.985; buf.vel[k + 2] *= 0.95 // drag
+      buf.pos[k] += buf.vel[k] * dt; buf.pos[k + 1] += buf.vel[k + 1] * dt; buf.pos[k + 2] += buf.vel[k + 2] * dt
+      if (buf.pos[k + 1] < 0.06) { buf.pos[k + 1] = 0.06; buf.vel[k + 1] *= -0.18; buf.vel[k] *= 0.7; buf.vel[k + 2] *= 0.7 } // skim the surface
+      aLife[i] = buf.life[i] / buf.max[i]
+    }
+    geo.attributes.position.needsUpdate = true
+    geo.attributes.aLife.needsUpdate = true
   })
-  return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]}>
-      <coneGeometry args={[5, 20, 7, 1, true]} />
-      <meshStandardMaterial
-        color={0xbfe2f2} roughness={0.92} transparent opacity={0} side={THREE.DoubleSide}
-      />
-    </mesh>
-  )
+
+  return <points geometry={geo} material={mat} frustumCulled={false} />
 }
 
 // ─── HELM CHALLENGE — sail through the gates (hero minigame) ──
@@ -618,9 +704,14 @@ function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
     const CRUISE = 4.0 // baseline headway so the yacht is always making way
     if (sp < 0.03) {
       const k = keys.current
-      // first arrow press "engages" the helm → hero text clears for the race
-      if (gameRef?.current && !gameRef.current.engaged && (k['ArrowUp'] || k['ArrowDown'] || k['ArrowLeft'] || k['ArrowRight'])) {
-        gameRef.current.engaged = true
+      if (gameRef?.current) {
+        const g = gameRef.current
+        // first arrow press "engages" the helm → hero text clears for the race
+        if (!g.engaged && (k['ArrowUp'] || k['ArrowDown'] || k['ArrowLeft'] || k['ArrowRight'])) g.engaged = true
+        // steering hard at speed throws spray against the lens
+        g.turn = (k['ArrowLeft'] || k['ArrowRight']) && b.speed > 6 ? Math.min(b.speed / 20, 1) : 0
+        if (k['ArrowLeft']) g.turnSide = 'left'
+        else if (k['ArrowRight']) g.turnSide = 'right'
       }
       if (keys.current['ArrowLeft'])  b.heading += dt * 1.1
       if (keys.current['ArrowRight']) b.heading -= dt * 1.1
@@ -650,16 +741,21 @@ function SceneController({ scrollRef, boatStateRef, flightRef, gameRef }) {
     let segI = 0, segT = 0
 
     if (sp < 0.02) {
-      // Chase the boat from astern so the bow leads into the horizon (matches PATH[0])
       const c = Math.cos(b.heading), s = Math.sin(b.heading)
-      const ox = -42, oy = 13, oz = 16
+      // While racing the helm challenge: a higher, pulled-in chase that keeps
+      // the ship centred for navigation. Otherwise the cinematic stern chase
+      // with the bow leading to the horizon (and back to it once completed).
+      const racing = gameRef?.current?.engaged && !gameRef.current.done
+      const ox = racing ? -36 : -42
+      const oy = racing ?  20 :  13
+      const oz = racing ?  12 :  16
+      const lx = racing ?   4 :  16
+      const ly = racing ?   3 : 2.5
       tPos.current.set(
         b.pos.x + ox * c + oz * s,
         oy,
         b.pos.z - ox * s + oz * c,
       )
-      // look ahead, over the bow (local +x is forward)
-      const lx = 16, ly = 2.5
       tLook.current.set(b.pos.x + lx * c, ly, b.pos.z - lx * s)
     } else {
       let i = 0
@@ -743,7 +839,7 @@ export function Scene3D({ scrollRef, flightRef, gameRef }) {
       <Suspense fallback={null}>
         <OceanWater />
         <Yacht3D boatStateRef={boatStateRef} />
-        <BoatWake boatStateRef={boatStateRef} />
+        <WakeSpray boatStateRef={boatStateRef} />
         <Checkpoints boatStateRef={boatStateRef} scrollRef={scrollRef} gameRef={gameRef} />
         <UnderwaterParticles scrollRef={scrollRef} />
         <OceanFloor scrollRef={scrollRef} />

@@ -181,6 +181,65 @@ function CitationsOverlay({ flight, onReturn, bibliography }) {
   )
 }
 
+// ─── Water-on-the-lens splash during hard turns ──────────────
+function SplashFX({ gameRef }) {
+  const [s, setS] = useState({ intensity: 0, side: 'right' })
+  const drops = useRef(Array.from({ length: 22 }).map(() => {
+    const w = 10 + Math.random() * 34
+    return {
+      left: Math.random() * 100, top: Math.random() * 78,
+      w, h: w * (1.1 + Math.random() * 0.7), // slightly teardrop
+      delay: Math.random() * 1.4, dur: 0.9 + Math.random() * 1.2,
+    }
+  })).current
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const g = gameRef.current
+      const next = { intensity: g && g.active ? (g.turn || 0) : 0, side: g?.turnSide || 'right' }
+      setS(prev => (prev.intensity === next.intensity && prev.side === next.side) ? prev : next)
+    }, 90)
+    return () => clearInterval(iv)
+  }, [gameRef])
+
+  const o = Math.min(1, s.intensity * 1.45)
+  return (
+    <div aria-hidden="true" style={{
+      position: 'fixed', inset: 0, zIndex: 45, pointerEvents: 'none', overflow: 'hidden',
+      opacity: o, transition: 'opacity 0.35s ease',
+    }}>
+      {/* directional spray sheet from the side you're turning toward */}
+      <div style={{
+        position: 'absolute', inset: 0, filter: 'blur(2px)',
+        background: s.side === 'left'
+          ? 'linear-gradient(to right, rgba(206,228,238,0.24), rgba(206,228,238,0.05) 26%, transparent 48%)'
+          : 'linear-gradient(to left, rgba(206,228,238,0.24), rgba(206,228,238,0.05) 26%, transparent 48%)',
+      }} />
+      {/* droplets clinging to and dripping down the lens */}
+      {drops.map((d, i) => {
+        const onSide = s.side === 'left' ? d.left < 56 : d.left > 44
+        if (!onSide) return null
+        return <span key={i} style={{
+          position: 'absolute', left: `${d.left}%`, top: `${d.top}%`, width: d.w, height: d.h,
+          borderRadius: '48% 48% 50% 50% / 42% 42% 58% 58%',
+          background: 'radial-gradient(ellipse at 42% 28%, rgba(255,255,255,0.52), rgba(206,228,240,0.16) 55%, transparent 74%)',
+          boxShadow: 'inset 0 -1px 8px rgba(255,255,255,0.25)', filter: 'blur(0.6px)',
+          animation: `splash-drip ${d.dur}s ease-in ${d.delay}s infinite`,
+        }} />
+      })}
+      <style>{`
+        @keyframes splash-drip {
+          0%   { opacity: 0;    transform: translateY(-8px) scale(0.65); }
+          16%  { opacity: 0.95; transform: translateY(0) scale(1); }
+          68%  { opacity: 0.7; }
+          100% { opacity: 0;    transform: translateY(52px) scaleY(1.35) scaleX(0.82); }
+        }
+        @media (prefers-reduced-motion: reduce) { span { animation: none !important; } }
+      `}</style>
+    </div>
+  )
+}
+
 export default function App() {
   // scrollRef is read every frame by Scene3D — no re-renders
   const scrollRef = useRef(0)
@@ -192,7 +251,7 @@ export default function App() {
   const flightRef = useRef({ mode: 'none', t: 0 })
   const [flight, setFlight] = useState('none')
   // helm-challenge minigame state, read per-frame by Scene3D's Checkpoints
-  const gameRef = useRef({ active: false, idx: 0, collected: 0, total: 8, started: false, elapsed: 0, done: false, speed: 0, engaged: false, resetRequested: false })
+  const gameRef = useRef({ active: false, idx: 0, collected: 0, total: 8, started: false, elapsed: 0, done: false, speed: 0, engaged: false, turn: 0, turnSide: 'right', resetRequested: false })
   const timers = useRef([])
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
   const flying = flight !== 'none'
@@ -294,6 +353,7 @@ export default function App() {
       {!flying && <Navbar scrollProgress={scrollDisplay} />}
       {!flying && <HUD scrollProgress={scrollDisplay} />}
       {!flying && <MinigameHUD gameRef={gameRef} />}
+      {!flying && <SplashFX gameRef={gameRef} />}
 
       {/* ── Scrollable content layer (fades out during the flight) ── */}
       <div style={{
